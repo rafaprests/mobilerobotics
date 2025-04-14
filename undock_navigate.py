@@ -6,6 +6,10 @@ from geometry_msgs.msg import Twist
 from rclpy.qos import qos_profile_sensor_data, QoSProfile
 from enum import Enum
 from irobot_create_msgs.msg import HazardDetectionVector
+from irobot_create_msgs.action import Dock, Undock
+from rclpy.action import ActionClient
+#from geometry_msgs.msg import PoseStamped
+
 
 class TurtleState(Enum):
     FORWARD = 1
@@ -37,6 +41,9 @@ class SafeNavigation(Node):
             qos_profile
         )
 
+        self.undock_client = ActionClient(self, Undock, f'/{self.robot_name}/undock')
+        self.dock_client = ActionClient(self, Dock, f'/{self.robot_name}/dock')
+
         self.state = TurtleState.FORWARD
         self.hazard_detected = False
         self.hazard_direction = None
@@ -44,6 +51,29 @@ class SafeNavigation(Node):
         self.timer = self.create_timer(self.cycle_dt, self.control_cycle)
 
     def undock(self):
+        self.get_logger().info('Iniciando undock...')
+        
+        # Verifica se o servidor de undocking está disponível
+        if not self.undock_client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error('❌ Servidor de undocking não está disponível')
+            return
+        
+        goal_msg = Undock.Goal()
+        send_goal_future = self.undock_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(self, send_goal_future)
+
+        goal_handle = send_goal_future.result()
+        if not goal_handle.accepted:
+            self.get_logger().error('❌ Requisição de undocking rejeitada')
+            return
+
+        self.get_logger().info('⏳ Undocking em andamento...')
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future)
+
+        self.get_logger().info('✅ Undocking concluído com sucesso!')
+
+    def undockManual(self):
         self.get_logger().info('Iniciando undock: movendo para trás...')
         msg = Twist()
         msg.linear.x = -0.2  # Move para trás a 0.2 m/s
@@ -70,6 +100,27 @@ class SafeNavigation(Node):
         msg.angular.z = 0.0
         self.out_pub_vel.publish(msg)
 
+    def dock(self):
+        self.get_logger().info('🔋 Iniciando docking...')
+
+        if not self.dock_client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error('❌ Servidor de docking não está disponível')
+            return
+
+        goal_msg = Dock.Goal()
+        send_goal_future = self.dock_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(self, send_goal_future)
+
+        goal_handle = send_goal_future.result()
+        if not goal_handle.accepted:
+            self.get_logger().error('❌ Requisição de docking rejeitada')
+            return
+
+        self.get_logger().info('⏳ Docking em andamento...')
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future)
+
+        self.get_logger().info('✅ Docking concluído com sucesso!')
 
     def read_hazard(self, msg):
         self.hazard_detected = False
@@ -151,13 +202,23 @@ def main(args=None):
     rclpy.init(args=args)
 
     robot_name = sys.argv[1] if len(sys.argv) > 1 else input("Digite o nome do robô: ")
+    print(f"Inicializando SafeNavigationDock para {robot_name}...")
+
     node = SafeNavigation(robot_name)
 
-    # 🚀 Faz o undock antes de iniciar a navegação
-    node.undock()
-
     try:
-        rclpy.spin(node)
+        # Etapa 1: undock + giro 180°
+        node.undock()
+
+        # Etapa 2: navega desviando obstáculos por 20 segundos
+        print("Navegando por 20 segundos antes do docking...")
+        start_time = time.time()
+        while time.time() - start_time < 20:
+            rclpy.spin_once(node)
+
+        # Etapa 3: docking automático
+        node.dock()
+
     except KeyboardInterrupt:
         pass
     finally:
