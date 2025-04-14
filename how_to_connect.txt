@@ -1,0 +1,45 @@
+*connection robot and notebook in the same network
+click both lateral buttons of the robot to search for networks.
+when the blue light start doing circular movements, the robot network should be on the wifi list.
+connect.
+type on the webbrowser 192.168.10.1 and go to the wifi tab.
+activate a hotspot.
+type the name and the password of the hotspot in the web and click connect(select North America as radio bands).
+wait for the message "SUCCESSFULLY SENT PROVISION MESSAGE TO THE ROBOT" appears.
+wait for the light of the robot to be white without the circular movements.
+connect the notebook with the hotspot.
+both of them are in the same network.
+
+*commands to make the robot moves
+The command to start a container with ROS Iron is as follows:
+$ docker run -it --net=host --privileged --env="DISPLAY=$DISPLAY" --volume="${XAUTHORITY}:/root/.Xauthority" ros-iron-cyclone
+
+If the robot and the computer are on the same network, the topics, nodes, etc, of the robot should be visible
+$ ros2 topic list
+
+when typed the topic list command, they appear in the robots name folder, you should copy the robots name folder to make the next command.
+
+To test control of the robot with keyboard, run
+$ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args --remap cmd_vel:=/NAME_OF_THE_ROBOT/cmd_vel
+
+now you should see the keys to moving the robot around
+
+*how to make the robot run a code
+Attaching a new terminal on a container
+Once a container runs, the following command can be used to get its ID:
+$ docker ps
+
+A new terminal can be connected to a container with ID using
+$ docker exec -it <id of container> bash
+
+if you have a code copied inside the container, then the robot should run the code just by doing for instance python3 /root/move_robot.py
+
+*example
+I created a code in my local machine that the only thing it does is to move the robot forward, named it move_robot.py
+Then, I did the following comands:
+docker ps
+docker cp move_robot.py <ID OF CONTAINER>:/root/
+docker exec -it <ID OF CONTAINER> bash
+python3 /root/move_robot.py
+
+
