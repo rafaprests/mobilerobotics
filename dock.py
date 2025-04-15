@@ -1,3 +1,6 @@
+###nao ta funcionando
+
+
 import rclpy
 from rclpy.node import Node
 from irobot_create_msgs.action import Dock

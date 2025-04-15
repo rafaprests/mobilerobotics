@@ -1,3 +1,4 @@
+import math
 import sys
 import time
 import rclpy
@@ -8,7 +9,7 @@ from enum import Enum
 from irobot_create_msgs.msg import HazardDetectionVector
 from irobot_create_msgs.action import Dock, Undock
 from rclpy.action import ActionClient
-#from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Odometry
 
 
 class TurtleState(Enum):
@@ -29,17 +30,31 @@ class SafeNavigation(Node):
 
         qos_profile = QoSProfile(depth=10)
 
+        #subscription to read hazards
         self.in_sub_hazard = self.create_subscription(
             HazardDetectionVector,
             f'/{robot_name}/hazard_detection',
             self.read_hazard,
             qos_profile_sensor_data
         )
+        #subscription to control velocity
         self.out_pub_vel = self.create_publisher(
             Twist,
             f'/{robot_name}/cmd_vel',
             qos_profile
         )
+        #subscription to control position in the room
+        self.odom_subscription = self.create_subscription(
+            Odometry,
+            f'/{robot_name}/odom',
+            self.odom_callback,
+            qos_profile_sensor_data
+        )
+
+        self.current_position = (0.0, 0.0)
+        self.current_yaw = 0.0
+
+        self.dock_position = None
 
         self.undock_client = ActionClient(self, Undock, f'/{self.robot_name}/undock')
         self.dock_client = ActionClient(self, Dock, f'/{self.robot_name}/dock')
@@ -73,32 +88,72 @@ class SafeNavigation(Node):
 
         self.get_logger().info('✅ Undocking concluído com sucesso!')
 
-    def undockManual(self):
-        self.get_logger().info('Iniciando undock: movendo para trás...')
-        msg = Twist()
-        msg.linear.x = -0.2  # Move para trás a 0.2 m/s
-        msg.angular.z = 0.0  # Sem rotação
+    def euler_from_quaternion(self, quat):
+        x, y, z, w = quat
+        # roll (x-axis rotation)
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
 
-        for _ in range(10):  # Move para trás por 2 segundos (10 * 0.2s)
-            self.out_pub_vel.publish(msg)
-            time.sleep(0.2)
+        # pitch (y-axis rotation)
+        sinp = 2 * (w * y - z * x)
+        if abs(sinp) >= 1:
+            pitch = math.copysign(math.pi / 2, sinp)
+        else:
+            pitch = math.asin(sinp)
 
-        # Gira 180 graus
-        self.get_logger().info('Realizando giro de 180 graus...')
-        msg.linear.x = 0.0
-        msg.angular.z = 0.5  # Velocidade angular positiva
+        # yaw (z-axis rotation)
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
 
-        duration = 3.14 / 0.5  # Tempo para girar 180 graus = pi rad / velocidade
-        steps = int(duration / 0.2)
+        return roll, pitch, yaw
 
-        for _ in range(steps):  # Publica comandos por aproximadamente 6.28 segundos
-            self.out_pub_vel.publish(msg)
-            time.sleep(0.2)
 
-        # Para o movimento
-        self.get_logger().info('Giro completo. Undock finalizado.')
-        msg.angular.z = 0.0
-        self.out_pub_vel.publish(msg)
+    def navigate_to_dock(self, dock_position):
+        dock_x, dock_y = dock_position
+
+        # Calculate angle to dock
+        dx = dock_x - self.current_position[0]
+        dy = dock_y - self.current_position[1]
+        desired_angle = math.atan2(dy, dx)
+
+        # Compute angular difference
+        angle_diff = desired_angle - self.current_yaw
+        angle_diff = (angle_diff + math.pi) % (2 * math.pi) - math.pi  # Normalize to [-pi, pi]
+
+        # 1. Rotate toward dock
+        while abs(angle_diff) > 0.005:  # threshold: 0.05 rad ~ 3 degrees
+            twist = Twist()
+            twist.angular.z = 0.3 if angle_diff > 0 else -0.3
+            self.out_pub_vel.publish(twist)
+
+            # Recalculate angle_diff
+            dx = dock_x - self.current_position[0]
+            dy = dock_y - self.current_position[1]
+            desired_angle = math.atan2(dy, dx)
+            angle_diff = desired_angle - self.current_yaw
+            angle_diff = (angle_diff + math.pi) % (2 * math.pi) - math.pi
+
+            rclpy.spin_once(self)
+
+        # Stop rotating
+        self.out_pub_vel.publish(Twist())
+
+        # 2. Move forward until close to dock
+        while math.hypot(dx, dy) > 0.2:  # distance threshold
+            twist = Twist()
+            twist.linear.x = 0.2
+            self.out_pub_vel.publish(twist)
+
+            dx = dock_x - self.current_position[0]
+            dy = dock_y - self.current_position[1]
+
+            rclpy.spin_once(self)
+
+        # Stop
+        self.out_pub_vel.publish(Twist())
+        self.get_logger().info("Docking complete!")
 
     def dock(self):
         self.get_logger().info('🔋 Iniciando docking...')
@@ -135,6 +190,24 @@ class SafeNavigation(Node):
                 elif frame in ["bump_center", "bump_front"]:
                     self.hazard_direction = "front"
 
+    def odom_callback(self, msg):
+        self.current_position = (
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y
+        )
+
+
+        # Extract orientation in yaw
+        orientation_q = msg.pose.pose.orientation
+        quaternion = (
+            orientation_q.x,
+            orientation_q.y,
+            orientation_q.z,
+            orientation_q.w
+        )
+        (_, _, yaw) = self.euler_from_quaternion(quaternion)
+        self.current_yaw = yaw
+
     def control_cycle(self):
         if self.state == TurtleState.FORWARD:
             self.output_forward()
@@ -162,13 +235,13 @@ class SafeNavigation(Node):
     def output_turn_left(self):
         msg = Twist()
         msg.linear.x = 0.0
-        msg.angular.z = 0.5
+        msg.angular.z = 1.0
         self.out_pub_vel.publish(msg)
 
     def output_turn_right(self):
         msg = Twist()
         msg.linear.x = 0.0
-        msg.angular.z = -0.5
+        msg.angular.z = -1.0
         self.out_pub_vel.publish(msg)
 
     def next_state(self):
@@ -176,7 +249,7 @@ class SafeNavigation(Node):
         if self.state == TurtleState.FORWARD and self.hazard_detected:
             self.state = TurtleState.BACKWARD
             transition = True
-        elif self.state == TurtleState.BACKWARD and self.evt_enough_time_spent(1.5):
+        elif self.state == TurtleState.BACKWARD and self.evt_enough_time_spent(0.5):
             if self.hazard_direction == "left":
                 self.state = TurtleState.TURN_RIGHT
             elif self.hazard_direction == "right":
@@ -210,13 +283,21 @@ def main(args=None):
         # Etapa 1: undock + giro 180°
         node.undock()
 
+        # Espera odometria estar atualizada
+        time.sleep(0.1)
+        node.dock_position = node.current_position
+        print(f"Posição da estação salva: {node.dock_position}")
+
+
         # Etapa 2: navega desviando obstáculos por 20 segundos
-        print("Navegando por 20 segundos antes do docking...")
+        print("Navegando por 10 segundos antes do docking...")
         start_time = time.time()
-        while time.time() - start_time < 20:
+        while time.time() - start_time < 10:
             rclpy.spin_once(node)
 
         # Etapa 3: docking automático
+        print(f"Posição do robo agora: {node.current_position}")
+        node.navigate_to_dock(node.dock_position)
         node.dock()
 
     except KeyboardInterrupt:
