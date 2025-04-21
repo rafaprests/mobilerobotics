@@ -53,25 +53,36 @@ Core classes and logic:
 
 To run the script:
 - run a docker image in your computer:
+```bash
 $ docker run -it --net=host --privileged --env="DISPLAY=$DISPLAY" --volume="${XAUTHORITY}:/root/.Xauthority" ros-iron-cyclone
+```
 
 - connect both robot and computer in the same network
 - to confirm thay are in the same network, type the following command:
+```bash
 $ ros2 topic list
+```
 - if you are able to see the name of the robot and its topics, you are connected.
 
 - once a container runs, the following command can be used to get its ID:
+```bash
 $ docker ps
+```
 
 - a new terminal can be connected to a container with ID using
+```bash
 $ docker exec -it <id of container> bash
+```
 
-- copy your code to the container with
+- copy your code to the container with:
+```bash
 $ docker cp move_robot.py <ID OF CONTAINER>:/root/
+```
 
 - once the code is copied, run with 
+```bash
 $ python3 name_of_your_code.py
-
+```
 
 ## 🧪 Example Topics Used
 
