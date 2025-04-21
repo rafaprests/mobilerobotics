@@ -1,3 +1,5 @@
+# after achieving to do the moving part, we started trying to undock the robot
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist

@@ -1,4 +1,5 @@
-###nao ta funcionando
+# this code doesnt work, it was our first try to implement the docking, our first
+# strategy was to implement it separated from the main code, but then we changed it
 
 
 import rclpy

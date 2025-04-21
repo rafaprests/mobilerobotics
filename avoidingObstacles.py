@@ -1,3 +1,6 @@
+# in this code we managed to move the robot as the asked in the project. the final code
+# was developed from this code
+
 import sys
 import rclpy
 from rclpy.node import Node

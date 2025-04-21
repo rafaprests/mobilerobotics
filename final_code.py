@@ -1,3 +1,5 @@
+# here we merged the undocking with the navigation and started trying to dock the robot. 
+
 import math
 import sys
 import time
