@@ -69,7 +69,7 @@ $ ros2 topic list
 $ docker ps
 ```
 
-- a new terminal can be connected to a container with ID using
+- a new terminal can be connected to a container with ID using:
 ```bash
 $ docker exec -it <id of container> bash
 ```
@@ -79,7 +79,7 @@ $ docker exec -it <id of container> bash
 $ docker cp move_robot.py <ID OF CONTAINER>:/root/
 ```
 
-- once the code is copied, run with 
+- once the code is copied, run with:
 ```bash
 $ python3 name_of_your_code.py
 ```
