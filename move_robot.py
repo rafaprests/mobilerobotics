@@ -1,3 +1,5 @@
+#first code of all, developed to understand how the publisher works
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist

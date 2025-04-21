@@ -1,3 +1,6 @@
+# second code, as oriented by the teacher, it would be easier for us if the robot moved by 
+# a state machine, then we implemented this way
+
 import sys
 import rclpy
 from rclpy.node import Node

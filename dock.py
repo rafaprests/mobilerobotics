@@ -4,7 +4,7 @@
 
 import rclpy
 from rclpy.node import Node
-from irobot_create_msgs.action import Dock
+from irobot_create_msgs.action import Dock # type: ignore
 from rclpy.action import ActionClient
 import sys
 

@@ -8,8 +8,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from rclpy.qos import qos_profile_sensor_data, QoSProfile
 from enum import Enum
-from irobot_create_msgs.msg import HazardDetectionVector
-from irobot_create_msgs.action import Dock, Undock
+from irobot_create_msgs.msg import HazardDetectionVector # type: ignore
+from irobot_create_msgs.action import Dock, Undock # type: ignore
 from rclpy.action import ActionClient
 from nav_msgs.msg import Odometry
 

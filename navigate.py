@@ -1,3 +1,7 @@
+# third code, after developing moving.py with the state machine we implemented the checking
+# if the hit is at the left or right of the robot, this way we could avoid obstacles cleverly.
+# now the moving part was done.
+
 import sys
 import rclpy
 from rclpy.node import Node
@@ -7,7 +11,7 @@ from rclpy.qos import qos_profile_sensor_data
 from rclpy.qos import QoSProfile
 from enum import Enum
 
-from irobot_create_msgs.msg import HazardDetectionVector
+from irobot_create_msgs.msg import HazardDetectionVector # type: ignore
 
 # Enumerating the states of the FSM
 class TurtleState(Enum):

@@ -6,7 +6,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
-from irobot_create_msgs.msg import HazardDetectionVector  # Para detectar obstáculos
+from irobot_create_msgs.msg import HazardDetectionVector  # type: ignore # Para detectar obstáculos
 
 class SafeNavigation(Node):
     def __init__(self):
