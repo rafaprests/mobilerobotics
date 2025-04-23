@@ -1,4 +1,4 @@
-# here we merged the undocking with the navigation and started trying to dock the robot. 
+# here we merged the undocking with the navigation and started trying to dock the robot.
 
 import math
 import sys
@@ -68,27 +68,27 @@ class SafeNavigation(Node):
         self.timer = self.create_timer(self.cycle_dt, self.control_cycle)
 
     def undock(self):
-        self.get_logger().info('Iniciando undock...')
-        
-        # Verifica se o servidor de undocking está disponível
+        self.get_logger().info('Initiating undock...')
+
+        # Checks if the undocking server is available
         if not self.undock_client.wait_for_server(timeout_sec=5.0):
-            self.get_logger().error('❌ Servidor de undocking não está disponível')
+            self.get_logger().error('❌ Undocking server is not available')
             return
-        
+
         goal_msg = Undock.Goal()
         send_goal_future = self.undock_client.send_goal_async(goal_msg)
         rclpy.spin_until_future_complete(self, send_goal_future)
 
         goal_handle = send_goal_future.result()
         if not goal_handle.accepted:
-            self.get_logger().error('❌ Requisição de undocking rejeitada')
+            self.get_logger().error('❌ Undocking request rejected')
             return
 
-        self.get_logger().info('⏳ Undocking em andamento...')
+        self.get_logger().info('⏳ Undocking in progress...')
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future)
 
-        self.get_logger().info('✅ Undocking concluído com sucesso!')
+        self.get_logger().info('✅ Undocking completed successfully!')
 
     def euler_from_quaternion(self, quat):
         x, y, z, w = quat
@@ -115,12 +115,12 @@ class SafeNavigation(Node):
         attempt = 1
 
         while True:
-            self.get_logger().info(f"➡️ Tentativa de docking #{attempt}...")
+            self.get_logger().info(f"➡️ Docking attempt #{attempt}...")
             attempt += 1
 
             dock_x, dock_y = dock_position
 
-            # 1. Girar em direção ao dock
+            # 1. Rotate towards the dock
             dx = dock_x - self.current_position[0]
             dy = dock_y - self.current_position[1]
             desired_angle = math.atan2(dy, dx)
@@ -129,8 +129,8 @@ class SafeNavigation(Node):
 
             while abs(angle_diff) > 0.05:
                 if self.hazard_detected:
-                    self.get_logger().warn("❌ Colisão detectada durante rotação. Cancelando docking...")
-                    self.voltar_ao_comportamento_normal()
+                    self.get_logger().warn("❌ Collision detected during rotation. Cancelling docking...")
+                    self.return_to_normal_behavior()
                     break
 
                 twist = Twist()
@@ -144,13 +144,13 @@ class SafeNavigation(Node):
                 angle_diff = desired_angle - self.current_yaw
                 angle_diff = (angle_diff + math.pi) % (2 * math.pi) - math.pi
             else:
-                self.out_pub_vel.publish(Twist())  # Para rotação
+                self.out_pub_vel.publish(Twist())  # Stop rotation
 
-                # 2. Ir em linha reta até o dock
+                # 2. Move straight towards the dock
                 while math.hypot(dx, dy) > 0.2:
                     if self.hazard_detected:
-                        self.get_logger().warn("❌ Colisão detectada durante aproximação. Cancelando docking...")
-                        self.voltar_ao_comportamento_normal()
+                        self.get_logger().warn("❌ Collision detected during approach. Cancelling docking...")
+                        self.return_to_normal_behavior()
                         break
 
                     twist = Twist()
@@ -162,27 +162,27 @@ class SafeNavigation(Node):
                     dy = dock_y - self.current_position[1]
                 else:
                     self.out_pub_vel.publish(Twist())
-                    self.get_logger().info("✅ Aproximação concluída! Iniciando docking final.")
+                    self.get_logger().info("✅ Approach completed! Initiating final docking.")
                     self.dock()
-                    break  # docking bem-sucedido
+                    break  # Successful docking
 
-    def voltar_ao_comportamento_normal(self):
-        self.get_logger().info("⏪ Voltando ao modo aleatório por alguns segundos...")
+    def return_to_normal_behavior(self):
+        self.get_logger().info("⏪ Returning to random mode for a few seconds...")
 
         start_time = time.time()
         self.state = TurtleState.FORWARD
         self.cycle_last_transition = self.cycle_current
         self.time_since_last_transition = 0.0
 
-        while time.time() - start_time < 5:  # tempo "normal" antes de tentar docking novamente
+        while time.time() - start_time < 5:  # "normal" time before attempting docking again
             rclpy.spin_once(self)
 
 
     def dock(self):
-        self.get_logger().info('🔋 Iniciando docking...')
+        self.get_logger().info('🔋 Initiating docking...')
 
         if not self.dock_client.wait_for_server(timeout_sec=5.0):
-            self.get_logger().error('❌ Servidor de docking não está disponível')
+            self.get_logger().error('❌ Docking server is not available')
             return
 
         goal_msg = Dock.Goal()
@@ -191,14 +191,14 @@ class SafeNavigation(Node):
 
         goal_handle = send_goal_future.result()
         if not goal_handle.accepted:
-            self.get_logger().error('❌ Requisição de docking rejeitada')
+            self.get_logger().error('❌ Docking request rejected')
             return
 
-        self.get_logger().info('⏳ Docking em andamento...')
+        self.get_logger().info('⏳ Docking in progress...')
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future)
 
-        self.get_logger().info('✅ Docking concluído com sucesso!')
+        self.get_logger().info('✅ Docking completed successfully!')
 
     def read_hazard(self, msg):
         self.hazard_detected = False
@@ -297,29 +297,29 @@ class SafeNavigation(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    robot_name = sys.argv[1] if len(sys.argv) > 1 else input("Digite o nome do robô: ")
-    print(f"Inicializando SafeNavigationDock para {robot_name}...")
+    robot_name = sys.argv[1] if len(sys.argv) > 1 else input("Enter the robot name: ")
+    print(f"Initializing SafeNavigationDock for {robot_name}...")
 
     node = SafeNavigation(robot_name)
 
     try:
-        # Etapa 1: undock + giro 180°
+        # Step 1: undock + 180° turn
         node.undock()
 
-        # Espera odometria estar atualizada
+        # Wait for odometry to be updated
         time.sleep(0.1)
         node.dock_position = node.current_position
-        print(f"Posição da estação salva: {node.dock_position}")
+        print(f"Dock station position saved: {node.dock_position}")
 
 
-        # Etapa 2: navega desviando obstáculos por 20 segundos
-        print("Navegando por 10 segundos antes do docking...")
+        # Step 2: navigate avoiding obstacles for 20 seconds
+        print("Navigating for 20 seconds before docking...")
         start_time = time.time()
-        while time.time() - start_time < 10:
+        while time.time() - start_time < 20:
             rclpy.spin_once(node)
 
-        # Etapa 3: docking automático
-        print(f"Posição do robo agora: {node.current_position}")
+        # Step 3: automatic docking
+        print(f"Current robot position: {node.current_position}")
         node.navigate_to_dock(node.dock_position)
         node.dock()
 
